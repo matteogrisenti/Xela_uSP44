@@ -13,11 +13,15 @@ parser = argparse.ArgumentParser(description="XELA CSV Offline Visualizer")
 parser.add_argument("filename", help="Name of the CSV file to load (e.g., test1.csv)")
 parser.add_argument("--folder", default="csv_records/", help="Path to the folder containing the CSV")
 parser.add_argument("--mode", choices=['normal', 'slow'], default='normal', help="Playback mode: 'normal' (real-time sync) or 'slow' (frame-by-frame)")
+parser.add_argument("--sensitivity", type=float, default=20.0, help="Multiplier for how fast the dots grow. >1.0 for faster growth, <1.0 for slower.")
+parser.add_argument("--max-size", type=float, default=3500.0, help="Maximum allowed dot size (area) to prevent them from breaking the grid layout.")
+# ----------------------
 args = parser.parse_args()
 
 csv_path = f"{args.folder}{args.filename}"
 print(f"Loading data from: {csv_path}")
 print(f"Playback Mode: {args.mode.upper()}")
+print(f"Sensitivity: {args.sensitivity}x | Max Size: {args.max_size}")
 
 try:
     df = pd.read_csv(csv_path)
@@ -119,7 +123,18 @@ def update_frame(tick):
         scale_pos = 0.05 if is_calibrated else 500.0
         scale_size = 0.001 if is_calibrated else 10.0
         
-        sizes.append(max(10, abs(delta_z) / scale_size))
+        # --- SIZE LOGIC ---
+        # 1. Calculate base size from Z-axis force
+        raw_calculated_size = abs(delta_z) / scale_size
+        
+        # 2. Apply user's sensitivity multiplier
+        sensitive_size = raw_calculated_size * args.sensitivity
+        
+        # 3. Clamp between min (10) and max (args.max_size)
+        final_size = min(max(10, sensitive_size), args.max_size)
+        # ----------------------
+        
+        sizes.append(final_size)
         x_offsets.append(grid_x[i-1] + (delta_x / scale_pos))
         y_offsets.append(grid_y[i-1] - (delta_y / scale_pos)) 
 
@@ -128,11 +143,8 @@ def update_frame(tick):
 
 # 5. Run the Animation
 if args.mode == 'slow':
-    # Fixed 50ms interval between every single frame
     ani = animation.FuncAnimation(fig, update_frame, frames=len(df), interval=50, repeat=False)
 else:
-    # Fast 30ms loop (approx 33 FPS) that uses the system clock to skip/hold frames to stay in perfect real-time sync
-    ani = animation.FuncAnimation(fig, update_frame, frames=itertools.count(), interval=30, repeat=False)
-
+    ani = animation.FuncAnimation(fig, update_frame, frames=itertools.count(), interval=30, repeat=False, cache_frame_data=False)
 fig.patch.set_facecolor('black')
 plt.show()
