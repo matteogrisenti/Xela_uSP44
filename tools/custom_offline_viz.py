@@ -147,8 +147,8 @@ def update_frame(tick):
             text_str = f"X: {fmt.format(delta_force_x)}\nY: {fmt.format(delta_force_y)}\nZ: {fmt.format(delta_force_z)}"
             
             ax.text(grid_x[i-1], grid_y[i-1], text_str, 
-                    color='#00FF00', ha='center', va='center', 
-                    fontsize=10, family='monospace', fontweight='bold')
+                    color="#FFFFFF", ha='center', va='center', 
+                    fontsize=15, family='monospace', fontweight='bold')
 
     if args.style == 'bubbles':
         ax.scatter(x_offsets, y_offsets, s=sizes, c='#00FF00', alpha=0.8, edgecolors='white')
