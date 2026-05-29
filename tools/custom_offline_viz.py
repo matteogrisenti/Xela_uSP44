@@ -5,15 +5,19 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import sys
 import argparse
+import time
+import itertools
 
 # 1. Terminal Argument Configuration
 parser = argparse.ArgumentParser(description="XELA CSV Offline Visualizer")
 parser.add_argument("filename", help="Name of the CSV file to load (e.g., test1.csv)")
 parser.add_argument("--folder", default="csv_records/", help="Path to the folder containing the CSV")
+parser.add_argument("--mode", choices=['normal', 'slow'], default='normal', help="Playback mode: 'normal' (real-time sync) or 'slow' (frame-by-frame)")
 args = parser.parse_args()
 
 csv_path = f"{args.folder}{args.filename}"
 print(f"Loading data from: {csv_path}")
+print(f"Playback Mode: {args.mode.upper()}")
 
 try:
     df = pd.read_csv(csv_path)
@@ -24,9 +28,13 @@ except FileNotFoundError:
 # Clean column names (strips any accidental spaces)
 df.columns = df.columns.str.strip()
 
-# Find the time column dynamically (Looks for 'time' or defaults to column 0)
+# Find the time column dynamically
 time_cols = [col for col in df.columns if 'time' in col.lower()]
 time_col_name = time_cols[0] if time_cols else df.columns[0]
+
+# Pre-calculate relative times for the whole file to make real-time playback super fast
+start_time = df.iloc[0][time_col_name]
+df['relative_time'] = df[time_col_name] - start_time
 
 # 2. Sensor Layout (uSPa44 4x4 Grid)
 grid_x = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
@@ -35,11 +43,11 @@ grid_y = [3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0]
 fig, ax = plt.subplots(figsize=(7, 7))
 fig.canvas.manager.set_window_title('XELA CSV Offline Visualizer')
 
-# We use the very first frame to center the idle state AND set the starting clock
 baseline = df.iloc[0]
-start_time = baseline[time_col_name]
 
-# Helper function to find columns safely
+# Real-time clock tracker
+playback_start_real_time = None
+
 def get_col(row, idx, axis):
     if f"{idx}{axis.upper()}" in row:
         return row[f"{idx}{axis.upper()}"]
@@ -48,7 +56,32 @@ def get_col(row, idx, axis):
     return 0 
 
 # 3. Animation Function
-def update_frame(frame_index):
+def update_frame(tick):
+    global playback_start_real_time
+    
+    # --- TIME SYNC LOGIC ---
+    if args.mode == 'slow':
+        # Frame-by-frame mode (Ignores real-world time)
+        frame_index = tick
+        if frame_index >= len(df):
+            ani.event_source.stop()
+            return
+    else:
+        # Normal real-time mode
+        if playback_start_real_time is None:
+            playback_start_real_time = time.time()
+        
+        elapsed_real_time = time.time() - playback_start_real_time
+        
+        # Magically find the closest past frame that matches our real-world elapsed time
+        idx = df['relative_time'].searchsorted(elapsed_real_time) - 1
+        frame_index = max(0, min(idx, len(df) - 1))
+        
+        # Stop the animation if we reached the end of the recording
+        if frame_index >= len(df) - 1:
+            ani.event_source.stop()
+    # -----------------------
+
     ax.clear()
     
     # Keep the grid static and squared
@@ -60,12 +93,9 @@ def update_frame(frame_index):
     ax.set_facecolor('black') 
     
     row = df.iloc[frame_index]
+    relative_time = row['relative_time']
     
-    # Calculate relative elapsed time
-    current_time = row[time_col_name]
-    relative_time = current_time - start_time
-    
-    ax.set_title(f"CSV Playback - Frame: {frame_index} | Elapsed: {relative_time:.3f} s", color='white')
+    ax.set_title(f"CSV Playback [{args.mode.upper()}] - Frame: {frame_index} | Elapsed: {relative_time:.3f} s", color='white')
     
     sizes = []
     x_offsets = []
@@ -97,7 +127,12 @@ def update_frame(frame_index):
     ax.scatter(x_offsets, y_offsets, s=sizes, c='#00FF00', alpha=0.8, edgecolors='white')
 
 # 5. Run the Animation
-ani = animation.FuncAnimation(fig, update_frame, frames=len(df), interval=50, repeat=False)
+if args.mode == 'slow':
+    # Fixed 50ms interval between every single frame
+    ani = animation.FuncAnimation(fig, update_frame, frames=len(df), interval=50, repeat=False)
+else:
+    # Fast 30ms loop (approx 33 FPS) that uses the system clock to skip/hold frames to stay in perfect real-time sync
+    ani = animation.FuncAnimation(fig, update_frame, frames=itertools.count(), interval=30, repeat=False)
 
 fig.patch.set_facecolor('black')
 plt.show()
