@@ -16,7 +16,7 @@ parser.add_argument("--mode", choices=['normal', 'slow'], default='normal', help
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Multiplier for bubble growth.")
 parser.add_argument("--max-size", type=float, default=3500.0, help="Maximum allowed dot size.")
 parser.add_argument("--style", choices=['bubbles', 'text'], default='bubbles', help="Visual style: 'bubbles' or 'text'")
-parser.add_argument("--noise-filter", type=float, default=0.05, help="Deadzone for Force values (default: 0.005N)")
+parser.add_argument("--noise-filter", type=float, default=0.02, help="Deadzone for Force values (default: 0.005N)")
 parser.add_argument("--raw-noise-filter", type=float, default=15.0, help="Deadzone for Raw positional movement (default: 15 ticks)")
 args = parser.parse_args()
 
