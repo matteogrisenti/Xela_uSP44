@@ -16,8 +16,8 @@ from utility.contact_visualization import load_contact_windows, add_contact_over
 
 
 
-def load_and_process_data(csv_path):
-    """Carica il CSV e restituisce i dati processati e pronti per il plot."""
+def load_and_process_data(csv_path, folder=None, show_contacts=False, correct_drift=False, drift_method="highpass", poly_deg=2):
+    """Carica il CSV e restituisce i dati processati e pronti per il plot, inclusi eventuali contatti e correzioni."""
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
@@ -49,8 +49,24 @@ def load_and_process_data(csv_path):
         y_label = unit
         z_data_all[i] = (val_z - base_z).values
 
-    return time_data, z_data_all, y_label
+    # CARICAMENTO DEI CONTATTI
+    df_contacts = None
+    if show_contacts and folder is not None and load_contact_windows is not None:
+        df_contacts = load_contact_windows(folder, "contacts_windows.csv")
 
+    # APPLICAZIONE MODULARE DEL DETRENDING
+    if correct_drift and apply_deviation_management is not None:
+        print(f"Applying drift correction using method: {drift_method}...")
+        z_data_all = apply_deviation_management(
+            time_data, 
+            z_data_all, 
+            method=drift_method, 
+            deg=poly_deg,
+            cutoff_hz=0.005, # Eventualmente parametrizzabile
+            fs=133.0         # Assumi frequenza sensore
+        )
+
+    return time_data, z_data_all, y_label, df_contacts
 
 
 
@@ -194,23 +210,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     csv_path = os.path.join(args.folder, args.filename)
-    time_data, z_data_all, y_label = load_and_process_data(csv_path)
-
-    df_contacts = None
-    if args.show_contacts and load_contact_windows is not None:
-        df_contacts = load_contact_windows(args.folder, "contacts_windows.csv")
-
-    # APPLICAZIONE MODULARE DEL DETRENDING
-    if args.correct_drift and apply_deviation_management is not None:
-        print(f"Applying drift correction using method: {args.drift_method}...")
-        z_data_all = apply_deviation_management(
-            time_data, 
-            z_data_all, 
-            method=args.drift_method, 
-            deg=args.poly_deg,
-            cutoff_hz=0.005, # Eventualmente parametrizzabile da CLI
-            fs=133.0        # Assumi frequenza sensore
-        )
+    time_data, z_data_all, y_label, df_contacts = load_and_process_data(
+        csv_path=csv_path,
+        folder=args.folder,
+        show_contacts=args.show_contacts,
+        correct_drift=args.correct_drift,
+        drift_method=args.drift_method,
+        poly_deg=args.poly_deg
+    )
 
     # Generazione dei plot (passando l'eventuale taxel singolo selezionato)
     if not args.taxel:

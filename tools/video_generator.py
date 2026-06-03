@@ -30,12 +30,27 @@ parser.add_argument("--xmin", type=float, default=0.000)
 parser.add_argument("--xmax", type=float, default=None)
 parser.add_argument("--ymin", type=float, default=-0.02)
 parser.add_argument("--ymax", type=float, default=0.05)
+
+parser.add_argument("--taxel", type=int, default=None, choices=range(1, 17))
+parser.add_argument("--show-contacts", action="store_true")
+parser.add_argument("-t", "--threshold", type=float, default=None)
+parser.add_argument("--correct-drift", action="store_true")
+parser.add_argument("--drift-method", type=str, default="highpass", choices=["poly", "highpass"])
+parser.add_argument("--poly-deg", type=int, default=2)
 args = parser.parse_args()
 
-# 1. Caricamento Dati tramite la tua utility
+# 1. Caricamento Dati tramite la tua utility (Aggiornato con la nuova firma)
 csv_path = os.path.join(args.folder, args.filename)
 print(f"Loading data from: {csv_path}")
-time_data, z_data_all, y_label = load_and_process_data(csv_path)
+
+time_data, z_data_all, y_label, df_contacts = load_and_process_data(
+    csv_path=csv_path,
+    folder=args.folder,
+    show_contacts=args.show_contacts,
+    correct_drift=args.correct_drift,
+    drift_method=args.drift_method,
+    poly_deg=args.poly_deg
+)
 
 # 2. Generazione del Grafico Base scelto
 xmin_val = args.xmin
@@ -43,11 +58,21 @@ xmax_val = args.xmax if args.xmax is not None else time_data[-1]
 
 print(f"Generating base plot: {args.plot_type.upper()}...")
 if args.plot_type == 'global':
-    fig, axes = create_global_plot(time_data, z_data_all, y_label, xmin_val, xmax_val, args.ymin, args.ymax)
+    # Aggiunti parametri threshold, df_contacts e selected_taxel
+    fig, axes = create_global_plot(
+        time_data, z_data_all, y_label, 
+        xmin=xmin_val, xmax=xmax_val, ymin=args.ymin, ymax=args.ymax,
+        threshold=args.threshold, df_contacts=df_contacts, selected_taxel=args.taxel
+    )
     axes_list = [axes] # Trasforma l'asse singolo in lista per uniformità
 else:
-    fig, axes = create_grid_plot(time_data, z_data_all, y_label, xmin_val, xmax_val, args.ymin, args.ymax)
-    axes_list = axes.flat # Flatten della matrice 4x4 in una lista 1D
+    # Aggiunti parametri threshold, df_contacts e selected_taxel
+    fig, axes = create_grid_plot(
+        time_data, z_data_all, y_label, 
+        xmin=xmin_val, xmax=xmax_val, ymin=args.ymin, ymax=args.ymax,
+        threshold=args.threshold, df_contacts=df_contacts, selected_taxel=args.taxel
+    )
+    axes_list = axes.flat # Flatten della matrice (4x4 o 1x1) in una lista 1D
 
 # 3. Preparazione Animazione (Aggiunta barre rosse a tutti i subplot)
 time_bars = []
