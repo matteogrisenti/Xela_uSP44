@@ -8,6 +8,7 @@ import os
 parser = argparse.ArgumentParser(description="XELA Sensor Noise Analyzer")
 parser.add_argument("filename", help="Name of the CSV file (recorded WITHOUT touching the sensor)")
 parser.add_argument("--folder", default="csv_records/", help="Path to the folder containing the CSV")
+parser.add_argument("--folder_output", default="results/noise_study_results/", help="Path to the folder to store the results")
 args = parser.parse_args()
 
 csv_path = os.path.join(args.folder, args.filename)
@@ -105,7 +106,7 @@ print("\n")
 
 # 5. Export Full Report
 output_filename = f"noise_report_{os.path.splitext(args.filename)[0]}.csv"
-output_path = os.path.join(args.folder, output_filename)
+output_path = os.path.join(args.folder_output, output_filename)
 res_df.to_csv(output_path, index=False)
 
 print(f"✅ Full report for all individual cells saved to: {output_path}")
