@@ -11,6 +11,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 from utility.zeroing import calculate_tare_csv
 from utility.deviation_menagment import apply_deviation_management
+from utility.contact_visualization import load_contact_windows, add_contact_overlays
 
 
 
@@ -53,7 +54,7 @@ def load_and_process_data(csv_path):
 
 
 
-def create_grid_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=None, ymax=None, selected_taxel=None):
+def create_grid_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=None, ymax=None, threshold=None, df_contacts=None, selected_taxel=None):
     """Genera e restituisce la Figura e gli Assi per la griglia 4x4 (o cella singola)."""
     # Se è selezionato un taxel specifico, riduciamo la griglia a 1x1 invece di 4x4
     if selected_taxel is not None:
@@ -65,10 +66,21 @@ def create_grid_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=
         ax.set_title(f'Taxel {selected_taxel} (Individual Analysis)', fontsize=16)
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
+
+        # Disegna la linea di threshold se definita
+        if threshold is not None:
+            ax.axhline(threshold, color='black', linewidth=2.0, linestyle='--', zorder=4, label=f'Threshold ({threshold})')
+            ax.axhline(-threshold, color='black', linewidth=2.0, linestyle='--', zorder=4)
+            ax.legend(loc='upper right')
+
         ax.set(xlabel='Time (s)', ylabel=y_label)
         
         if xmin is not None or xmax is not None: ax.set_xlim(left=xmin, right=xmax)
         if ymin is not None or ymax is not None: ax.set_ylim(bottom=ymin, top=ymax)
+
+        # APPLICAZIONE OVERLAY CONTATTI
+        if add_contact_overlays and df_contacts is not None:
+            add_contact_overlays(ax, df_contacts)
         
         fig.tight_layout()
         return fig, axes
@@ -86,6 +98,16 @@ def create_grid_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
 
+        # Disegna la linea di threshold se definita
+        if threshold is not None:
+            ax.axhline(threshold, color='black', linewidth=2.0, linestyle='--', zorder=4, label=f'Threshold +/-({threshold})')
+            ax.axhline(-threshold, color='black', linewidth=2.0, linestyle='--', zorder=4)
+            ax.legend(loc='upper right')
+
+        # APPLICAZIONE OVERLAY CONTATTI
+        if add_contact_overlays and df_contacts is not None:
+            add_contact_overlays(ax, df_contacts)
+
     for ax in axes.flat:
         ax.set(xlabel='Time (s)', ylabel=y_label)
         if xmin is not None or xmax is not None: ax.set_xlim(left=xmin, right=xmax)
@@ -99,7 +121,7 @@ def create_grid_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=
 
 
 
-def create_global_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=None, ymax=None, selected_taxel=None):
+def create_global_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymin=None, ymax=None, threshold=None, df_contacts=None, selected_taxel=None):
     """Genera e restituisce la Figura e l'Asse per il grafico globale sovrapposto."""
     fig, ax = plt.subplots(figsize=(12, 6))
     colors = plt.cm.tab20.colors 
@@ -111,6 +133,13 @@ def create_global_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymi
         ax.plot(time_data, z_data_all[i], label=f'Taxel {i}', color=colors[(i-1)%20], linewidth=1.5, alpha=0.8)
 
     ax.axhline(0, color='black', linewidth=1.5, linestyle='--')
+
+    # Disegna la linea di threshold se definita
+    if threshold is not None:
+        ax.axhline(threshold, color='black', linewidth=2.0, linestyle='--', zorder=4, label=f'Threshold ({threshold})')
+        ax.axhline(-threshold, color='black', linewidth=2.0, linestyle='--', zorder=4)
+        ax.legend(loc='upper right')
+
     title_suffix = f' (Taxel {selected_taxel} Only)' if selected_taxel is not None else ' (All Channels Overlaid)'
     ax.set_title('Global Normal Force' + title_suffix, fontsize=14, fontweight='bold')
     ax.set_xlabel('Time (s)', fontsize=12)
@@ -119,6 +148,10 @@ def create_global_plot(time_data, z_data_all, y_label, xmin=None, xmax=None, ymi
 
     if xmin is not None or xmax is not None: ax.set_xlim(left=xmin, right=xmax)
     if ymin is not None or ymax is not None: ax.set_ylim(bottom=ymin, top=ymax)
+
+    # APPLICAZIONE OVERLAY CONTATTI
+    if add_contact_overlays and df_contacts is not None:
+        add_contact_overlays(ax, df_contacts)
 
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=9)
     fig.tight_layout()
@@ -139,6 +172,12 @@ if __name__ == "__main__":
     parser.add_argument("--xmax", type=float, default=None)
     parser.add_argument("--ymin", type=float, default=-0.050)
     parser.add_argument("--ymax", type=float, default=0.050)
+
+    parser.add_argument("--threshold", type=float, default=0.012,
+                        help="Valore di soglia da disegnare come linea orizzontale tratteggiata. Se non specificato, non viene disegnato.")
+
+    parser.add_argument("--show-contacts", action="store_true", default=True,
+                        help="Mostra le finestre temporali di contatto come bande verdi sullo sfondo.")
     
     # NUOVO: Selezione del singolo Taxel da studiare
     parser.add_argument("--taxel", type=int, default=None, choices=range(1, 17),
@@ -147,7 +186,7 @@ if __name__ == "__main__":
     # NUOVO: Parametri per la gestione delle deviazioni
     parser.add_argument("--correct-drift", action="store_true", 
                         help="Attiva la correzione e rimozione della deriva del segnale.")
-    parser.add_argument("--drift-method", type=str, default="poly", choices=["poly", "highpass"],
+    parser.add_argument("--drift-method", type=str, default="highpass", choices=["poly", "highpass"],
                         help="Metodo di correzione: 'poly' (polinomiale) o 'highpass' (filtro passa-alto).")
     parser.add_argument("--poly-deg", type=int, default=2, 
                         help="Grado del polinomio per il metodo 'poly' (default: 2).")
@@ -157,6 +196,10 @@ if __name__ == "__main__":
     csv_path = os.path.join(args.folder, args.filename)
     time_data, z_data_all, y_label = load_and_process_data(csv_path)
 
+    df_contacts = None
+    if args.show_contacts and load_contact_windows is not None:
+        df_contacts = load_contact_windows(args.folder, "contacts_windows.csv")
+
     # APPLICAZIONE MODULARE DEL DETRENDING
     if args.correct_drift and apply_deviation_management is not None:
         print(f"Applying drift correction using method: {args.drift_method}...")
@@ -165,17 +208,17 @@ if __name__ == "__main__":
             z_data_all, 
             method=args.drift_method, 
             deg=args.poly_deg,
-            cutoff_hz=0.01, # Eventualmente parametrizzabile da CLI
+            cutoff_hz=0.005, # Eventualmente parametrizzabile da CLI
             fs=133.0        # Assumi frequenza sensore
         )
 
     # Generazione dei plot (passando l'eventuale taxel singolo selezionato)
     if not args.taxel:
-        fig1, axes1 = create_grid_plot(time_data, z_data_all, y_label, args.xmin, args.xmax, args.ymin, args.ymax, selected_taxel=args.taxel)
+        fig1, axes1 = create_grid_plot(time_data, z_data_all, y_label, args.xmin, args.xmax, args.ymin, args.ymax, threshold=args.threshold, df_contacts=df_contacts, selected_taxel=args.taxel)
         win_title_grid = f'Taxel {args.taxel} Analysis' if args.taxel else '16 Channel Grid'
         fig1.canvas.manager.set_window_title(win_title_grid)
 
-    fig2, ax_main = create_global_plot(time_data, z_data_all, y_label, args.xmin, args.xmax, args.ymin, args.ymax, selected_taxel=args.taxel)
+    fig2, ax_main = create_global_plot(time_data, z_data_all, y_label, args.xmin, args.xmax, args.ymin, args.ymax, threshold=args.threshold, df_contacts=df_contacts, selected_taxel=args.taxel)
     win_title_global = f'Taxel {args.taxel} Overlaid' if args.taxel else 'Overlaid Channels'
     fig2.canvas.manager.set_window_title(win_title_global)
 

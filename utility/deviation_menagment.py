@@ -20,16 +20,20 @@ def remove_drift_polynomial(time_data, z_data, deg=2):
 
 def remove_drift_highpass(time_data, z_data, cutoff_hz=0.01, fs=133.0):
     """
-    Rimuove la deriva usando un filtro Butterworth passa-alto.
-    Ideale se si conosce la frequenza di campionamento (fs).
+    Rimuove la deriva usando un filtro Butterworth passa-alto CAUSALE.
+    Simula esattamente il comportamento del filtro applicato in tempo reale (real-time).
     """
-    # Configurazione del filtro (ordine 2 per evitare eccessive distorsioni di fase)
+    # Configurazione del filtro (ordine 2)
     nyquist = 0.5 * fs
     normal_cutoff = cutoff_hz / nyquist
     b, a = signal.butter(2, normal_cutoff, btype='high', analog=False)
     
-    # Applica il filtro in avanti e indietro (zero-phase filtering)
-    corrected_data = signal.filtfilt(b, a, z_data)
+    # Inizializziamo lo stato del filtro a zero (come all'accensione del sensore)
+    zi = signal.lfilter_zi(b, a) * 0.0
+    
+    # lfilter applica il filtro in modo causale (solo in avanti) sfruttando lo stato zi
+    corrected_data, _ = signal.lfilter(b, a, z_data, zi=zi)
+    
     return corrected_data
 
 def apply_deviation_management(time_data, z_data_all, method='poly', **kwargs):
