@@ -189,7 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("--ymin", type=float, default=-0.050)
     parser.add_argument("--ymax", type=float, default=0.050)
 
-    parser.add_argument("--threshold", type=float, default=0.012,
+    parser.add_argument("--threshold", type=float, default=None,
                         help="Valore di soglia da disegnare come linea orizzontale tratteggiata. Se non specificato, non viene disegnato.")
 
     parser.add_argument("--show-contacts", action="store_true", default=True,
