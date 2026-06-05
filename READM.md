@@ -8,6 +8,7 @@
 To collect data you need to:
 1. Serial CAN Activatio
 ```bash
+sudo killall slcand
 sudo slcand -o -s8 -t hw -S 3000000 /dev/ttyUSB0 
 sudo ip link set up can0 
 ```
