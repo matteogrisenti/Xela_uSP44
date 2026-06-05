@@ -1,1 +1,6 @@
 *.venv
+__pycheck__/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
